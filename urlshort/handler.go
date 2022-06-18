@@ -1,6 +1,9 @@
 package urlshort
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"gopkg.in/yaml.v3"
@@ -32,40 +35,51 @@ func MapHandler(pathsToUrls map[string]string, fallback http.Handler) http.Handl
 	}
 }
 
-type yamlMap []struct {
-	Path string `yaml:"path"`
-	Url  string `yaml:"url"`
+type pathMap []struct {
+	Path string `yaml:"path" json:"path"`
+	Url  string `yaml:"url" json:"url"`
 }
 
-func buildMap(ym yamlMap) map[string]string {
+func buildMap(pm pathMap) map[string]string {
 	m := make(map[string]string)
-	for _, r := range ym {
+	for _, r := range pm {
 		m[r.Path] = r.Url
 	}
 	return m
 }
 
-// YAMLHandler will parse the provided YAML and then return
+// ConfigHandler will parse the provided config and then return
 // an http.HandlerFunc (which also implements http.Handler)
 // that will attempt to map any paths to their corresponding
-// URL. If the path is not provided in the YAML, then the
+// URL. If the path is not provided in the config, then the
 // fallback http.Handler will be called instead.
 //
-// YAML is expected to be in the format:
+// Config is expected to be in the format:
 //
 //     - path: /some-path
 //       url: https://www.some-url.com/demo
 //
 // The only errors that can be returned all related to having
-// invalid YAML data.
+// invalid config data.
 //
 // See MapHandler to create a similar http.HandlerFunc via
 // a mapping of paths to urls.
-func YAMLHandler(yml []byte, fallback http.Handler) (http.HandlerFunc, error) {
-	var ym yamlMap
-	if err := yaml.Unmarshal(yml, &ym); err != nil {
+func ConfigHandler(conf []byte, format string, fallback http.Handler) (http.HandlerFunc, error) {
+	var pm pathMap
+
+	var err error
+	switch format {
+	case "yaml":
+		err = yaml.Unmarshal(conf, &pm)
+	case "json":
+		err = json.Unmarshal(conf, &pm)
+	default:
+		err = errors.New(fmt.Sprintf("unknown config format %q", format))
+	}
+	if err != nil {
 		return nil, err
 	}
-	m := buildMap(ym)
+
+	m := buildMap(pm)
 	return MapHandler(m, fallback), nil
 }
