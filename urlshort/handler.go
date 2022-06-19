@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	bolt "go.etcd.io/bbolt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -82,4 +83,34 @@ func ConfigHandler(conf []byte, format string, fallback http.Handler) (http.Hand
 
 	m := buildMap(pm)
 	return MapHandler(m, fallback), nil
+}
+
+// BoltHandler
+func BoltHandler(db *bolt.DB, fallback http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+
+		var url []byte
+
+		err := db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("PathMap"))
+			url = b.Get([]byte(r.URL.Path))
+			return nil
+		})
+
+		if err != nil {
+			http.Error(w, "Error while viewing DB", 500)
+			return
+		}
+
+		if url == nil {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+
+		http.Redirect(w, r, string(url), http.StatusFound)
+	}
 }
