@@ -27,13 +27,13 @@ func ParseLinks(r io.Reader) ([]Link, error) {
 	var l safeLinks
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go walkTreeRec(n, wg, &l)
+	go walkTreeRec(n, &wg, &l)
 	wg.Wait()
 
 	return l.l, nil
 }
 
-func walkTreeRec(n *html.Node, wg sync.WaitGroup, l *safeLinks) {
+func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 	// After returning the links, signal to WaitGroup
 	defer wg.Done()
 
