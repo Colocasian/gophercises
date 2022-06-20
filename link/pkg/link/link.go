@@ -13,11 +13,6 @@ type Link struct {
 	Text string
 }
 
-type safeLinks struct {
-	l  []Link
-	mu sync.Mutex
-}
-
 func ParseLinks(r io.Reader) ([]Link, error) {
 	n, err := html.Parse(r)
 	if err != nil {
@@ -33,15 +28,14 @@ func ParseLinks(r io.Reader) ([]Link, error) {
 	return l.l, nil
 }
 
+type safeLinks struct {
+	l  []Link
+	mu sync.Mutex
+}
+
 func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 	// After returning the links, signal to WaitGroup
 	defer wg.Done()
-
-	// Recursively call walkTreeRec on the child nodes
-	for cn := n.FirstChild; cn != nil; cn = cn.NextSibling {
-		wg.Add(1)
-		go walkTreeRec(cn, wg, l)
-	}
 
 	// Check if current node is an <a> tag
 	if n.Type == html.ElementNode && n.DataAtom == atom.A {
@@ -54,6 +48,7 @@ func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 		for _, attr := range n.Attr {
 			if ok = attr.Key == "href"; ok {
 				link.Href = attr.Val
+				link.Text = string(getDescendantText(n))
 				break
 			}
 		}
@@ -64,5 +59,28 @@ func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 			l.l = append(l.l, link)
 			l.mu.Unlock()
 		}
+
+		// Do not process links inside <a> tags: invalid HTML
+		return
 	}
+
+	// Recursively call walkTreeRec on the child nodes
+	for cn := n.FirstChild; cn != nil; cn = cn.NextSibling {
+		wg.Add(1)
+		go walkTreeRec(cn, wg, l)
+	}
+}
+
+func getDescendantText(n *html.Node) (text []byte) {
+	if n.Type == html.TextNode {
+		text = append(text, n.Data...)
+	}
+
+	// Recursively call getDescendantText on the child nodes
+	for cn := n.FirstChild; cn != nil; cn = cn.NextSibling {
+		ct := getDescendantText(cn)
+		text = append(text, ct...)
+	}
+
+	return text
 }

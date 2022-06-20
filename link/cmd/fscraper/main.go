@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Colocasian/gophercises/link/pkg/link"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -28,5 +29,9 @@ func main() {
 		log.Fatalf("could not parse links: %v", err)
 	}
 
-	fmt.Println(links)
+	bytes, err := yaml.Marshal(links)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf(string(bytes))
 }
