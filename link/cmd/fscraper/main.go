@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Colocasian/gophercises/link/pkg/link"
+	"github.com/Colocasian/gophercises/link"
 	"gopkg.in/yaml.v3"
 )
 
