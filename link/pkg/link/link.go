@@ -48,7 +48,12 @@ func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 		for _, attr := range n.Attr {
 			if ok = attr.Key == "href"; ok {
 				link.Href = attr.Val
+				// Sequential code to get link text
 				link.Text = string(getDescendantText(n))
+				// Code to get link text concurrently:
+				//var b []byte
+				//getDescendantTextConc(n, &b, nil)
+				//link.Text = string(b)
 				break
 			}
 		}
@@ -83,4 +88,33 @@ func getDescendantText(n *html.Node) (text []byte) {
 	}
 
 	return text
+}
+
+func getDescendantTextConc(n *html.Node, t *[]byte, wg *sync.WaitGroup) {
+	// If wg is not null, after returning the links, signal to WaitGroup
+	if wg != nil {
+		defer wg.Done()
+	}
+
+	var sz int
+	for cn := n.FirstChild; cn != nil; cn = cn.NextSibling {
+		sz++
+	}
+
+	cts := make([][]byte, sz)
+	var cwg sync.WaitGroup
+	// Recursively call getDescendantText on the child nodes
+	for i, cn := 0, n.FirstChild; cn != nil; i, cn = i+1, cn.NextSibling {
+		cwg.Add(1)
+		go getDescendantTextConc(cn, &cts[i], &cwg)
+	}
+	// Wait for all the children to return text
+	cwg.Wait()
+
+	if n.Type == html.TextNode {
+		*t = append(*t, n.Data...)
+	}
+	for _, ct := range cts {
+		*t = append(*t, ct...)
+	}
 }
