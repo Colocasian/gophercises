@@ -16,3 +16,6 @@
 # Ignore tmp files
 tmp/*
 
+# Project-specific
+# Ignore any generated XML file
+*.xml
