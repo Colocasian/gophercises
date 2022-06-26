@@ -2,6 +2,7 @@ package link
 
 import (
 	"io"
+	"strings"
 	"sync"
 
 	"golang.org/x/net/html"
@@ -49,7 +50,9 @@ func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 			if ok = attr.Key == "href"; ok {
 				link.Href = attr.Val
 				// Sequential code to get link text
-				link.Text = string(getDescendantText(n))
+				var t strings.Builder
+				getDescendantText(n, &t)
+				link.Text = t.String()
 				// Code to get link text concurrently:
 				//var b []byte
 				//getDescendantTextConc(n, &b, nil)
@@ -76,21 +79,18 @@ func walkTreeRec(n *html.Node, wg *sync.WaitGroup, l *safeLinks) {
 	}
 }
 
-func getDescendantText(n *html.Node) (text []byte) {
+func getDescendantText(n *html.Node, t *strings.Builder) {
 	if n.Type == html.TextNode {
-		text = append(text, n.Data...)
+		t.WriteString(n.Data)
 	}
 
 	// Recursively call getDescendantText on the child nodes
 	for cn := n.FirstChild; cn != nil; cn = cn.NextSibling {
-		ct := getDescendantText(cn)
-		text = append(text, ct...)
+		getDescendantText(cn, t)
 	}
-
-	return text
 }
 
-func getDescendantTextConc(n *html.Node, t *[]byte, wg *sync.WaitGroup) {
+func getDescendantTextConc(n *html.Node, t *strings.Builder, wg *sync.WaitGroup) {
 	// If wg is not null, after returning the links, signal to WaitGroup
 	if wg != nil {
 		defer wg.Done()
@@ -101,7 +101,7 @@ func getDescendantTextConc(n *html.Node, t *[]byte, wg *sync.WaitGroup) {
 		sz++
 	}
 
-	cts := make([][]byte, sz)
+	cts := make([]strings.Builder, sz)
 	var cwg sync.WaitGroup
 	// Recursively call getDescendantText on the child nodes
 	for i, cn := 0, n.FirstChild; cn != nil; i, cn = i+1, cn.NextSibling {
@@ -112,9 +112,9 @@ func getDescendantTextConc(n *html.Node, t *[]byte, wg *sync.WaitGroup) {
 	cwg.Wait()
 
 	if n.Type == html.TextNode {
-		*t = append(*t, n.Data...)
+		t.WriteString(n.Data)
 	}
 	for _, ct := range cts {
-		*t = append(*t, ct...)
+		t.WriteString(ct.String())
 	}
 }

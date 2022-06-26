@@ -15,13 +15,18 @@ func main() {
 	log.SetFlags(0)
 
 	flag.Parse()
-	if args.file == "" {
-		log.Fatalln("did not specify HTML file to parse")
-	}
 
-	f, err := os.Open(args.file)
-	if err != nil {
-		log.Fatalln(err)
+	var (
+		f   *os.File
+		err error
+	)
+	if args.file == "" {
+		f = os.Stdin
+	} else {
+		f, err = os.Open(args.file)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	links, err := link.ParseLinks(f)
